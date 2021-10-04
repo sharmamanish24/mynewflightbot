@@ -1,0 +1,26 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "script",
+			"scriptType": "batch",
+			"path": "",
+			"fileName": "build.cmd",
+			"scriptFile": true,
+			"script": "cmd",
+			"target": "cmd",
+			"uri": {
+				"$mid": 1,
+				"fsPath": "d:\\WorkSpace\\git_src\\mynewflightbot\\build.cmd",
+				"_sep": 1,
+				"path": "/d:/WorkSpace/git_src/mynewflightbot/build.cmd",
+				"scheme": "file"
+			},
+			"takesArgs": false,
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"label": "batch: build.cmd"
+		}
+	]
+}

@@ -13,86 +13,99 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Integration.AspNet.Core;
-using Microsoft.BotBuilderSamples.Bots;
-using Microsoft.BotBuilderSamples.Dialogs;
+
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+using Microsoft.Bot.Builder.Azure.Blobs;
+
+using Microsoft.BotBuilderSamples.Bots;
+using Microsoft.BotBuilderSamples.Dialogs;
+
 namespace Microsoft.BotBuilderSamples
 {
-    public class TranscriptProvider : IMiddleware
+
+  public class Startup
+  {
+    private readonly IConfiguration Configuration;
+    public Startup(IConfiguration configuration)
     {
-        private readonly ITranscriptStore transcriptStore;
-    
-        public TranscriptProvider(ITranscriptStore mtranscriptStore)
-        {
-            transcriptStore = mtranscriptStore;
-        }
-    
-        public async Task OnTurnAsync(ITurnContext context, NextDelegate next, CancellationToken cancellationToken = new CancellationToken())
-        {
-            context.TurnState.Add(transcriptStore);
-            await next(cancellationToken).ConfigureAwait(false);
-        }
+      Configuration = configuration;
     }
 
-    public class Startup
+    // This method gets called by the runtime. Use this method to add services to the container.
+    public void ConfigureServices(IServiceCollection services)
     {
-        // This method gets called by the runtime. Use this method to add services to the container.
-        public void ConfigureServices(IServiceCollection services)
-        {
-            services.AddControllers().AddNewtonsoftJson();
 
-            // Create the Bot Framework Adapter with error handling enabled.
-            services.AddSingleton<IBotFrameworkHttpAdapter, AdapterWithErrorHandler>();
+      services.AddHttpClient().AddControllers().AddNewtonsoftJson();
 
-            // Create the storage we'll be using for User and Conversation state. (Memory is great for testing purposes.)
-            services.AddSingleton<IStorage, MemoryStorage>();
+      // Create the Bot Framework Adapter with error handling enabled.
+      services.AddSingleton<IBotFrameworkHttpAdapter, AdapterWithErrorHandler>();
 
-            // Create the User state. (Used in this bot's Dialog implementation.)
-            services.AddSingleton<UserState>();
+      // Create the storage we'll be using for User and Conversation state. (Memory is great for testing purposes.)
+      services.AddSingleton<IStorage, MemoryStorage>();
 
-            // Create the Conversation state. (Used by the Dialog system itself.)
-            services.AddSingleton<ConversationState>();
+      // Create the User state. (Used in this bot's Dialog implementation.)
+      services.AddSingleton<UserState>();
 
-            // Register LUIS recognizer
-            services.AddSingleton<FlightBookingRecognizer>();
+      // Create the Conversation state. (Used by the Dialog system itself.)
+      services.AddSingleton<ConversationState>();
 
-            // Register the BookingDialog.
-            services.AddSingleton<BookingDialog>();
+      // Register LUIS recognizer
+      services.AddSingleton<FlightBookingRecognizer>();
 
-            // The MainDialog that will be run by the bot.
-            services.AddSingleton<MainDialog>();
+      // Register the BookingDialog.
+      services.AddSingleton<BookingDialog>();
 
-            services.AddSingleton<ITranscriptStore, MemoryTranscriptStore>();
-            
-            var transcriptMiddleware = new TranscriptLoggerMiddleware(new MemoryTranscriptStore());
-            services.AddSingleton(transcriptMiddleware);
+      // The MainDialog that will be run by the bot.
+      services.AddSingleton<MainDialog>();
 
-            // Create the bot as a transient. In this case the ASP Controller is expecting an IBot.
-            services.AddTransient<IBot, DialogAndWelcomeBot<MainDialog>>();
-            services.AddBot<DialogAndWelcomeBot<MainDialog>>();
-        }
+      // Create the bot as a transient. In this case the ASP Controller is expecting an IBot.
+      services.AddTransient<IBot, DialogAndWelcomeBot<MainDialog>>();
 
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-        {
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-            }
+      // Create the TranscriptLoggerMiddleware to log all activities to the TranscriptStore
+      services.AddSingleton<IMiddleware, TranscriptLoggerMiddleware>();
 
-            app.UseDefaultFiles()
-                .UseStaticFiles()
-                .UseWebSockets()
-                .UseRouting()
-                .UseAuthorization()
-                .UseEndpoints(endpoints =>
-                {
-                    endpoints.MapControllers();
-                });
+      // Create the TranscriptStore
+      services.AddSingleton<ITranscriptStore, BlobsTranscriptStore>(options =>
+      {
+        return new BlobsTranscriptStore(
+          Configuration.GetValue<string>("BlobConnectionString"),
+          Configuration.GetValue<string>("BlobContainerName")
+        );
+      });
 
-            // app.UseHttpsRedirection();
-        }
+      // Create the TranscriptStore
+      services.AddSingleton<ITranscriptLogger, BlobsTranscriptStore>(options =>
+      {
+        return new BlobsTranscriptStore(
+          Configuration.GetValue<string>("BlobConnectionString"),
+          Configuration.GetValue<string>("BlobContainerName")
+        );
+      });
+
     }
+
+    // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+    {
+      if (env.IsDevelopment())
+      {
+        app.UseDeveloperExceptionPage();
+      }
+
+      app.UseDefaultFiles()
+          .UseStaticFiles()
+          .UseWebSockets()
+          .UseRouting()
+          .UseAuthorization()
+          .UseEndpoints(endpoints =>
+          {
+            endpoints.MapControllers();
+          });
+
+      // app.UseHttpsRedirection();
+    }
+  }
 }
